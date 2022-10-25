@@ -26,8 +26,8 @@ type MyCustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func NewAuthorizer(scope string, audience string, issuer string, jwksURL string) *Authorizer {
-	jwks, err := keyfunc.Get(jwksURL, keyfunc.Options{})
+func NewAuthorizer(scope string, audience string, issuer string, jwksDomain string) *Authorizer {
+	jwks, err := keyfunc.Get(fmt.Sprintf("https://%s/.well-known/jwks.json", jwksDomain), keyfunc.Options{})
 	if err != nil {
 		log.Fatalf("Failed to get the JWKS from the given URL. Error: %s", err)
 	}

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/MicahParks/keyfunc"
@@ -43,36 +44,25 @@ func NewAuthorizer(scope string, audience string, issuer string, jwksDomain stri
 func (a *Authorizer) EnsureValidToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authorization := r.Header.Get("Authorization")
+		if authorization == "" {
+			http.Error(w, "Missing Authorization header", http.StatusBadRequest)
+			return
+		}
 		accessToken := strings.TrimPrefix(authorization, "Bearer ")
 
 		token, claims, err := a.ParseToken(accessToken)
 		if err != nil {
-			fmt.Println(err)
+			http.Error(w, "failed to parse token", http.StatusUnauthorized)
+			return
 		}
 
 		if !token.Valid {
-			http.Error(w, jwt.ErrTokenInvalidClaims.Error(), http.StatusUnauthorized)
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
 		}
 
-		if err := claims.Valid(); err != nil {
-			http.Error(w, jwt.ErrTokenInvalidClaims.Error(), http.StatusUnauthorized)
-		}
-
-		if !claims.HasScope(a.Scope) {
-			http.Error(w, errInvalidScope, http.StatusUnauthorized)
-		}
-
-		if claims.Issuer != a.Issuer {
-			http.Error(w, jwt.ErrTokenInvalidIssuer.Error(), http.StatusUnauthorized)
-		}
-
-		for _, i := range claims.Audience {
-			if i != a.Audience {
-				http.Error(w, jwt.ErrTokenInvalidAudience.Error(), http.StatusUnauthorized)
-			}
-		}
-
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), "claims", claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
